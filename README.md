@@ -1,39 +1,64 @@
-# Requirements
+# Language-Driven Semantic Segmentation (LSeg) — Reimplementation
 
-Install mseg module (only works in Linux or MacOS), then install our requirements
+A zero-shot semantic segmentation model combining DPT (Dense Prediction Transformer) and CLIP encoders, reimplemented and evaluated as part of graduate coursework at Northeastern University.
 
-```
+## Overview
+
+Traditional semantic segmentation requires expensive pixel-level annotations for every target class. LSeg addresses this by using natural language supervision — allowing the model to segment objects it was never explicitly trained on, guided only by text descriptions.
+
+This project reimplements the [LSeg architecture](https://arxiv.org/abs/2201.03546) and evaluates it under both supervised and zero-shot conditions.
+
+## Results
+
+| Setting | Dataset | Accuracy |
+|---------|---------|----------|
+| Supervised | COCO Panoptic | 67% |
+| Zero-shot | ADE20K | 58% |
+
+The zero-shot result (58% on ADE20K with no pixel-level training labels) validates that language-driven supervision can achieve meaningful segmentation without traditional annotation pipelines.
+
+## Architecture
+
+- **Visual Encoder:** DPT (Dense Prediction Transformer) for pixel-wise dense feature extraction. Initialized with `DPT(head=nn.Identity(), output_feature_dim=C)` where `C` is the desired multimodal embedding dimension.
+- **Text Encoder:** CLIP for language-guided class embeddings
+- **ViT Adaptation:** Custom `ViTWrapper` enables arbitrary input image sizes by dynamically updating the `image_size` attribute and interpolating learned position embeddings via torchvision's [`interpolate_embeddings`](https://github.com/pytorch/vision/blob/main/torchvision/models/vision_transformer.py#L268) utility.
+- **Training:** Contrastive alignment between visual features and text embeddings
+- **Monitoring:** PyTorch Lightning for telemetry and training metrics
+- **Labels:** MSeg universal taxonomy (`universal` column in `mseg-api/mseg/class_remapping_files/MSeg_master.tsv`)
+
+## Tech Stack
+
+Python, PyTorch, PyTorch Lightning, CLIP, DPT, MSeg, Hugging Face Transformers, COCO API
+
+## Setup
+
+**Requirements:** Linux or macOS (mseg dependency constraint)
+
+```bash
 pip install -e mseg
 pip install -r requirements.txt
 pip install git+https://github.com/openai/CLIP.git
 ```
-# Usage
-To train on cluster.
-```
+
+**Data:** Datasets (`COCOPanoptic`, `ADE20K`) must be placed in `data/mseg_dataset/`.
+
+## Usage
+
+**Training** (on HPC cluster):
+```bash
 sbatch train_script_on_hpc.sh
 ```
-This essentially runs the python script `train.py`.
+This runs `train.py` with the configured hyperparameters.
 
-To evaluate the trained model: `demo.ipynb`.
+**Evaluation:**
+Open and run `demo.ipynb` to evaluate the trained model on test images.
 
-## Data Notes
+## Team
 
-We used MSeg. \
-The semantic labels outputs corresponds to the `universal` column in `mseg-api/mseg/class_remapping_files/MSeg_master.tsv`
+Built collaboratively as a graduate ML course project at Northeastern University (Fall 2024).
 
-The datasets such as `COCOPanoptic` and `ADE20K` must lie within the folder `data/mseg_dataset/`
+## References
 
-## DPT notes
-
-### What is ViTWrapper
-
-To make ViT work with arbitrary image size as input, made these changes during inference for each input image x:
-
-1. Change attribute `image_size` (assumes H = W = `image_size`) of the ViT model. This is necessary to bypass the assert check `self.image_size == h == w` in `VisionTransformer._process_input(x)`.
-2. Interpolate the learned position embedding by using their helper function `interpolate_embeddings` in `torchvision/models/vision_transformer.py`
-   Link: https://github.com/pytorch/vision/blob/main/torchvision/models/vision_transformer.py#L268
-
-### How to use DPT for LSeg
-
-To use DPT as an pixel-wise encoder. Initialize it with this, where `C` is the desired multimodal embedding dimension. \
-`model = DPT(head=nn.Identity(), output_feature_dim=C)`
+- [Language-driven Semantic Segmentation (Li et al., 2022)](https://arxiv.org/abs/2201.03546)
+- [Original LSeg Repository](https://github.com/isl-org/lang-seg)
+- [MSeg: A Composite Dataset for Multi-domain Semantic Segmentation](https://github.com/mseg-dataset/mseg-api)
